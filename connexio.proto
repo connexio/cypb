@@ -1,0 +1,36 @@
+package connexio;
+
+// Contact data structure
+
+message Contact {
+
+  optional Name     name = 1;
+  repeated Email    email = 5;
+  repeated Phone    phone = 6;
+  optional string note = 12;
+}
+
+message Name {
+  // Raw - unstructured
+  optional string display_name = 1;     // Display / formatted name
+  
+  // Structured info - parts of name
+  optional string prefix = 2;
+  optional string first = 3;
+  optional string last = 4;
+  optional string middle = 5;
+  optional string suffix = 6;     
+
+  // nickname
+  optional string nickname = 7;
+}
+
+message Phone {
+  required string display_number = 1;
+}
+
+message Email {
+  required string email = 1;
+}
+
+

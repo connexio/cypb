@@ -6,11 +6,12 @@ See connexio.proto and run_google.py for test message and structure.
 
 Environment:
  * MacBook Pro 2.66Ghz Intel Core 2 Duo
- * Protobuf version: 2.3.0
  * Python version: 2.6.1
  * GCC 4.2.1
 
 Average running time on 10 runs:
- * Google's Python module: 0.711271 seconds.
- * C extension: 0.041584 seconds.
+ * Google's Python module (2.3): 0.711271 seconds.
+ * Google's C++ implementation for Python (2.4): 0.093410
+ * connex.io's C extension: 0.041584 seconds.
+
 

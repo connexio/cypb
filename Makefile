@@ -9,3 +9,8 @@ clean:
 	rm ctest.o
 	rm ctest.so
 
+test-generate:
+	protoc test.proto -o test.pb2
+	python generator.py test.pb2
+
+

@@ -1,0 +1,89 @@
+
+message Contact {
+
+  optional Name     name = 1;
+
+  // 2 is reserved for photo
+  optional Date birthday = 3;
+  optional Date anniversary = 4;
+
+  // contact info
+  repeated Email    email = 5;
+  repeated Phone    phone = 6;
+
+  repeated Job      job = 10;
+
+  optional string note = 12;
+}
+
+message Name {
+  // Raw - unstructured
+  optional string display_name = 1;     // Display / formatted name
+  
+  // Structured info - parts of name
+  optional string prefix = 2;
+  optional string first = 3;
+  optional string last = 4;
+  optional string middle = 5;
+  optional string suffix = 6;     
+
+  // nickname
+  optional string nickname = 7;
+}
+
+// Date field. 
+// For bithdays - year is optional, for job/education history - day is optional
+message Date {
+  optional int32 year = 1;  
+  optional int32 month = 2;
+  optional int32 day = 3;
+}
+
+enum PhoneType {
+  UNKNOWN = 1;
+  HOME_PHONE = 2;
+  HOME_FAX = 3;
+  HOME_MOBILE = 4;
+  WORK_PHONE = 5;
+  WORK_FAX = 6;
+  WORK_MOBILE = 7;
+  PAGER = 8;
+  ASSISTANT = 9;
+}
+
+message Phone {
+  required string display_number = 1;
+
+  optional PhoneType _type = 2[default = UNKNOWN];
+
+  // strucutured phone number
+  optional string country_code = 3;
+  optional string area_code = 4;
+  optional string number = 5;
+
+  // custom label
+  optional string label = 6;
+}
+
+enum EmailType {
+  PERSONAL = 1;
+  BUSINESS = 2;
+  OTHER_EMAIL = 3;
+}
+
+message Email {
+  required string email = 1;
+  optional EmailType _type = 2;
+  optional string label = 3;
+}
+
+message Job {
+  required string company = 1;
+  optional string position = 2;
+  optional string department = 3;
+  optional string description = 4;
+
+  optional Date startdate = 5;
+  optional Date enddate = 6;
+}
+

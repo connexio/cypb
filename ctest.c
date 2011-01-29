@@ -1,12 +1,43 @@
+/* 
+ * Protocol Buffers decoder for Python
+ *
+ * (C) Copyright 2011, connex.io gmbh
+ * */
 
 #include<stdio.h>
 #include<string.h>
 #include<Python.h>
 
+#define TYPE_DOUBLE         1
+#define TYPE_FLOAT          2
+#define TYPE_INT64          3
+#define TYPE_UINT64         4
+#define TYPE_INT32          5
+#define TYPE_FIXED64        6
+#define TYPE_FIXED32        7
+#define TYPE_BOOL           8
+#define TYPE_STRING         9
+#define TYPE_GROUP          10
+#define TYPE_MESSAGE        11
+#define TYPE_BYTES          12
+#define TYPE_UINT32         13
+#define TYPE_ENUM           14
+#define TYPE_SFIXED32       15
+#define TYPE_SFIXED64       16
+#define TYPE_SINT32         17
+#define TYPE_SINT64         18
 
+/* 
+ * message types / fields descriptor structure
+ * It is initialized by setup_table function, automatically generated code 
+ * based on proto descriptor file.
+ *
+ * ft[Message_Type_ID][Field_Number]
+ * Message Type ID is automatically assigned integer number to each message type.
+ */
 struct FieldDescriptor
 {
-    PyObject *name_str;
+    PyObject *name_str;         // pre-created PyString object for key / field name
     int repeated;
     int type;
     PyObject *default_val;
@@ -14,73 +45,13 @@ struct FieldDescriptor
 
 int flist[256][256];
 
-void setup_table()
-{
+/* import setup_table function */
+#include "descriptor_compiled.h"
 
-    flist[34][0] = 1;
-    ft[34][1].name_str = PyString_FromString("display_number");
-    ft[34][1].repeated = 0;
-    ft[34][1].type = 0;
-    flist[34][1] = -1;
 
-    flist[32][0] = 1;
-    ft[32][1].name_str = PyString_FromString("name");
-    ft[32][1].repeated = 0;
-    ft[32][1].type = 33;
-    flist[32][1] = 5;
-    ft[32][5].name_str = PyString_FromString("email");
-    ft[32][5].repeated = 1;
-    ft[32][5].type = 35;
-    flist[32][2] = 6;
-    ft[32][6].name_str = PyString_FromString("phone");
-    ft[32][6].repeated = 1;
-    ft[32][6].type = 34;
-    flist[32][3] = 12;
-    ft[32][12].name_str = PyString_FromString("note");
-    ft[32][12].repeated = 0;
-    ft[32][12].type = 0;
-    flist[32][4] = -1;
-
-    flist[33][0] = 1;
-    ft[33][1].name_str = PyString_FromString("display_name");
-    ft[33][1].repeated = 0;
-    ft[33][1].type = 0;
-    flist[33][1] = 2;
-    ft[33][2].name_str = PyString_FromString("prefix");
-    ft[33][2].repeated = 0;
-    ft[33][2].type = 0;
-    flist[33][2] = 3;
-    ft[33][3].name_str = PyString_FromString("first");
-    ft[33][3].repeated = 0;
-    ft[33][3].type = 0;
-    flist[33][3] = 4;
-    ft[33][4].name_str = PyString_FromString("last");
-    ft[33][4].repeated = 0;
-    ft[33][4].type = 0;
-    flist[33][4] = 5;
-    ft[33][5].name_str = PyString_FromString("middle");
-    ft[33][5].repeated = 0;
-    ft[33][5].type = 0;
-    flist[33][5] = 6;
-    ft[33][6].name_str = PyString_FromString("suffix");
-    ft[33][6].repeated = 0;
-    ft[33][6].type = 0;
-    flist[33][6] = 7;
-    ft[33][7].name_str = PyString_FromString("nickname");
-    ft[33][7].repeated = 0;
-    ft[33][7].type = 0;
-    flist[33][7] = -1;
-
-    flist[35][0] = 1;
-    ft[35][1].name_str = PyString_FromString("email");
-    ft[35][1].repeated = 0;
-    ft[35][1].type = 0;
-    flist[35][1] = -1;
-}
-
+/* Given message type and field number, returns type of field */
 int get_type(int msgtype, int fieldid)
 {
-    // check if it is known field..
     if( ft[msgtype][fieldid].name_str ) {
         return ft[msgtype][fieldid].type;
     }
@@ -92,12 +63,12 @@ PyObject *object_new(int type)
 {
     PyObject *obj = PyDict_New();
 
-    // set defaults..
     int i;
     for(i=0; flist[type][i] != -1; i++) {
         struct FieldDescriptor *f = &ft[type][flist[type][i]];
         if( f->repeated )
             PyDict_SetItem(obj, f->name_str, PyList_New(0));
+        // TODO: set default value for field.
     }
     return obj;
 }
@@ -118,7 +89,9 @@ void object_add_field(PyObject* obj, int type, int field_id, PyObject* child)
     }
 }
 
-char *get_varint(char *c, long *val)
+/* Varint, 32bit and 64bit decoders  */
+
+char *get_varint(char *c, unsigned long *val)
 {
     int shift = 0;
     *val = 0;
@@ -153,6 +126,7 @@ char *get_64bit(char *c, unsigned long *val)
 }
 
 
+/* Decoder context / stack. Used when decoding full message. */
 struct context {
     PyObject *node;
     int type;
@@ -161,10 +135,8 @@ struct context {
 } stack[128];
 int top = 0;
 
-void* decode(char *msg, int type)
+PyObject* full_decode(char *msg, int type)
 {
-//    printf("Len : %d\n", strlen(msg));
-
     char *c = msg;
     // create root object
     top = 1;
@@ -174,43 +146,60 @@ void* decode(char *msg, int type)
 
     while(*c) {
 
-        unsigned long tag, len;
+        unsigned long tag, len, val;
+        unsigned int wire_type;
         int type = -1;
 
         c = get_varint(c, &tag);
-        c = get_varint(c, &len);
+        wire_type = tag & 0x07;
         tag >>= 3;
+
         type = get_type(stack[top].type, tag);
 
-        // printf("Tag %d Len %d Type = %d\n", tag, len, type);
+        switch(type) {
+            case -1:
+                // Unknown field.. Skip.
+                // TODO: based on wire-type..
+                break;
 
-        if(type==-1) {
-            // unknown field, skip it..
-            c = c + len;
-        } else if(type==0) {
+            case TYPE_STRING:
+                c = get_varint(c, &len);
 
-            // primitive.. just set attribute
-            char tmp = c[len];
-            c[len] = '\0';
-            object_add_field(stack[top].node, stack[top].type, tag, PyString_FromString(c));
-            c[len] = tmp;
+                // temporarily null-terminate string to slice it and restore back after copy.
+                char tmp = c[len];
+                c[len] = '\0';
+                object_add_field(stack[top].node, stack[top].type, tag, PyString_FromString(c));
+                c[len] = tmp;
+                c = c + len;
+                break;
 
-            c = c + len;
-        } else {
-            // create new node and push it to stack
-            // printf("Pushing...\n");
-            top++;
-            stack[top].node = object_new(type);
-            stack[top].type = type;
-            stack[top].field_id = tag;
-            stack[top].end_idx = c + len;
+            case TYPE_ENUM:
+                c = get_varint(c, &val);
+                object_add_field(stack[top].node, stack[top].type, tag, Py_BuildValue("i", val));
+                break;
+
+            case TYPE_INT32:
+                c = get_varint(c, &val);
+                object_add_field(stack[top].node, stack[top].type, tag, Py_BuildValue("i", val));
+                break;
+
+            default:
+                // Treat it as type_message
+                c = get_varint(c, &len);
+
+                // create new node and push it to stack
+                top++;
+                stack[top].node = object_new(type);
+                stack[top].type = type;
+                stack[top].field_id = tag;
+                stack[top].end_idx = c + len;
         }
 
-        // finished? Pop from stack?
+        // Pop decoded messages from stack
         while( top && c >= stack[top].end_idx ) {
             if( top-1 ) {
+                /* Link child node to parent node */
                 object_add_field(stack[top-1].node, stack[top-1].type, stack[top].field_id, stack[top].node);
-                // printf("Popping...\n");
                 top--;
             } else {
                 return stack[top].node;
@@ -220,14 +209,14 @@ void* decode(char *msg, int type)
     return NULL;
 }
 
-
+/* Python wrapper for full decode function */
 static PyObject* py_decode(PyObject *self, PyObject *args)
 {
     int type;
     char *msg;
 
     if (PyArg_ParseTuple(args, "is", &type, &msg)) {
-         return decode(msg, type);
+         return full_decode(msg, type);
     }
 
     return NULL;
@@ -235,10 +224,11 @@ static PyObject* py_decode(PyObject *self, PyObject *args)
 
 static PyMethodDef methods[] = {
     {"decode",  py_decode, METH_VARARGS, ""},
-    {NULL, NULL, 0, NULL}        /* Sentinel */
+    {NULL, NULL, 0, NULL} 
 };
 
 
+/* Lazy decoder */
 
 typedef struct {
   PyObject_HEAD
@@ -248,10 +238,6 @@ typedef struct {
   char *msg_data;
   PyObject *fields;
 } PBMsg;
-
-static PyMethodDef pbmsg_methods[] = {
-    {NULL, NULL, 0, NULL}        /* Sentinel */
-};
 
 static PBMsg* PBMsg_new(int msg_type, char *msg_data);
 static PyObject* PBMsg_getattr(PyObject  *o, PyObject  *attr_name);
@@ -278,11 +264,11 @@ PBMsg_new_py(PyTypeObject *type, PyObject *args, PyObject *kwds)
 PyTypeObject PBMsgType = {
   PyObject_HEAD_INIT(NULL)
   0,                            /*ob_size*/
-  "ctest.PBMsg",           /*tp_name*/
-  sizeof(PBMsg),              /*tp_basicsize*/
+  "ctest.PBMsg",                /*tp_name*/
+  sizeof(PBMsg),                /*tp_basicsize*/
   0,                            /*tp_itemsize*/
   /* methods */
-  (destructor)PBMsg_dealloc,  /*tp_dealloc*/
+  (destructor)PBMsg_dealloc,    /*tp_dealloc*/
   0,                            /*tp_print*/
   0,                            /*tp_getattr*/
   0,                            /*tp_setattr*/
@@ -294,7 +280,7 @@ PyTypeObject PBMsgType = {
   0,                            /*tp_hash*/
   0,                            /*tp_call*/
   0,                            /*tp_str*/
-  PBMsg_getattr,                            /*tp_getattro*/
+  PBMsg_getattr,                /*tp_getattro*/
   0,                            /*tp_setattro*/
   0,                            /*tp_as_buffer*/
   Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
@@ -305,7 +291,7 @@ PyTypeObject PBMsgType = {
   0,                            /*tp_weaklistoffset*/
   0,                            /*tp_iter*/
   0,                            /*tp_iternext*/
-  pbmsg_methods,              /*tp_methods*/
+  0,                            /*tp_methods*/
   0,                            /*tp_members*/
   0,                            /*tp_getset*/
   0,                            /*tp_base*/
@@ -313,74 +299,94 @@ PyTypeObject PBMsgType = {
   0,                            /*tp_descr_get*/
   0,                            /*tp_descr_set*/
   0,                            /*tp_dictoffset*/
-  (initproc)PBMsg_init,       /*tp_init*/
+  (initproc)PBMsg_init,         /*tp_init*/
   0,                            /*tp_alloc*/
-  PBMsg_new_py,                  /*tp_new*/
+  PBMsg_new_py,                 /*tp_new*/
   0,                            /*tp_free*/
   0,                            /*tp_is_gc*/
 };
 
-
-
+/* Initialize new lazy decoder object */
 static PBMsg* PBMsg_new(int msg_type, char *msg_data)
 {
         PBMsg *self;
         self = (PBMsg *)PBMsgType.tp_alloc(&PBMsgType, 0);
-        if (self == NULL) return NULL;
+        if (self == NULL) 
+            return NULL;
 
         self->decoded = 0;
         self->msg_type = msg_type;
+
+        /* take copy of buffer */
         self->msg_data = malloc(strlen(msg_data)+1);
         strcpy(self->msg_data, msg_data);
 
         return self;
 }
 
+/* Decode all primitive fields in current level, don't go deeper */
 void PBMsg_decode(PBMsg *node)
 {
-    // printf("\nDecoding node... type=%d\n", node->msg_type);
-
-    // Traverse childs...
     char *c = node->msg_data;
     node->fields = object_new(node->msg_type);
-
+    
     while(*c) {
 
-        unsigned long tag, len;
+        char tmp;
+        unsigned long tag, len, val;
+        unsigned int wire_type;
         int type = -1;
 
         c = get_varint(c, &tag);
-        c = get_varint(c, &len);
+        wire_type = tag & 0x07;
         tag >>= 3;
+
         type = get_type(node->msg_type, tag);
 
-        // printf("Tag %d Len %d Type = %d\n", tag, len, type);
+        switch(type) {
+            case -1:
+                // Unknown field.. Skip.
+                // TODO: based on wire-type..
+                break;
 
-        if(type==-1) {
-            // unknown field, skip it..
-        } else if(type==0) {
-            // primitive.. just set attribute
-            char tmp = c[len];
-            c[len] = '\0';
-            object_add_field(node->fields, node->msg_type, tag, PyString_FromString(c));
-            c[len] = tmp;
-        } else {
-            // Create unparsed child node..
-            char tmp = c[len];
-            c[len] = '\0';
-            PBMsg *child = PBMsg_new(type, c);
-            c[len] = tmp;
+            case TYPE_STRING:
+                c = get_varint(c, &len);
+                // temporarily null-terminate string to slice it and restore back after copy.
+                tmp = c[len];
+                c[len] = '\0';
+                object_add_field(node->fields, node->msg_type, tag, PyString_FromString(c));
+                c[len] = tmp;
+                c = c + len;
+                break;
 
-            object_add_field(node->fields, node->msg_type, tag, child);
+            case TYPE_ENUM:
+                c = get_varint(c, &val);
+                object_add_field(node->fields, node->msg_type, tag, Py_BuildValue("i", val));
+                break;
+
+            case TYPE_INT32:
+                c = get_varint(c, &val);
+                object_add_field(node->fields, node->msg_type, tag, Py_BuildValue("i", val));
+                break;
+
+            default:
+                c = get_varint(c, &len);
+                // Create unparsed child node..
+                tmp = c[len];
+                c[len] = '\0';
+                PBMsg *child = PBMsg_new(type, c);
+                c[len] = tmp;
+
+                object_add_field(node->fields, node->msg_type, tag, child);
+
+                c += len;
         }
-
-        c += len;
     }
  
     node->decoded = 1;
 }
 
-
+/* decode current node only when child attribute is accessed, then cache the result */
 static PyObject* PBMsg_getattr(PyObject  *o, PyObject  *attr_name)
 {
     PBMsg *self = (PBMsg*)o;
@@ -390,7 +396,6 @@ static PyObject* PBMsg_getattr(PyObject  *o, PyObject  *attr_name)
 
     return PyDict_GetItem(self->fields, attr_name);
 }
-
 
 
 PyMODINIT_FUNC initctest(void); /*proto*/

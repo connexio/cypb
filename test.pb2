@@ -1,0 +1,62 @@
+
+É
+
+test.proto"¢
+Contact
+name (2.Name
+birthday (2.Date
+anniversary (2.Date
+email (2.Email
+phone (2.Phone
+job
+ (2.Job
+note (	"{
+Name
+display_name (	
+prefix (	
+first (	
+last (	
+middle (	
+suffix (	
+nickname (	"0
+Date
+year (
+month (
+day ("ã
+Phone
+display_number (	"
+_type (2
+.PhoneType:UNKNOWN
+country_code (	
+	area_code (	
+number (	
+label (	"@
+Email
+email (	
+_type (2
+.EmailType
+label (	"É
+Job
+company (	
+position (	
+
+department (	
+description (	
+	startdate (2.Date
+enddate (2.Date*ê
+	PhoneType
+UNKNOWN
+
+HOME_PHONE
+HOME_FAX
+HOME_MOBILE
+
+WORK_PHONE
+WORK_FAX
+WORK_MOBILE	
+PAGER
+	ASSISTANT	*8
+	EmailType
+PERSONAL
+BUSINESS
+OTHER_EMAIL

@@ -7,22 +7,22 @@ msg = "CiAKBUF0YXNoGghBdGFtdXJhZCINSGV6cmV0a3VsaXlldioUChJhdGFteXJhdEBnbWFpbC5jb
 
 start = time.time()
 for i in range(5000):
-    a = ctest.PBMsg(1, msg)
+    a = ctest.PBMsg(32, msg)
 print "Our lazy c parser: ", time.time()-start
 
 
 print a.name.display_name, " ", a.name.first, " ", a.name.last
 
 print "Emails (first access):"
-print a.emails
+print a.email
 
 print "Emails: "
-for e in a.emails:
+for e in a.email:
     print " * ", e.email
 
 print "Phones: "
-for p in a.phones:
-    print " * ", p.phone
+for p in a.phone:
+    print " * ", p.display_number
 
 print "Note:"
 print a.note

@@ -39,66 +39,100 @@ char *get_msg_len(char *c, long *len)
     return c;
 }
 
-/* 
- *  Types table
- *    primitives: 
- *       0: string
- *    messages:
- *       1: contact
- *       2: email
- *       3: phone
- *       4: name
-*/
+struct FieldDescriptor
+{
+    PyObject *name_str;
+    int repeated;
+    int type;
+    PyObject *default_val;
+} ft[256][256];
+
+int flist[256][256];
+
+void setup_table()
+{
+
+    flist[34][0] = 1;
+    ft[34][1].name_str = PyString_FromString("display_number");
+    ft[34][1].repeated = 0;
+    ft[34][1].type = 0;
+    flist[34][1] = -1;
+
+    flist[32][0] = 1;
+    ft[32][1].name_str = PyString_FromString("name");
+    ft[32][1].repeated = 0;
+    ft[32][1].type = 33;
+    flist[32][1] = 5;
+    ft[32][5].name_str = PyString_FromString("email");
+    ft[32][5].repeated = 1;
+    ft[32][5].type = 35;
+    flist[32][2] = 6;
+    ft[32][6].name_str = PyString_FromString("phone");
+    ft[32][6].repeated = 1;
+    ft[32][6].type = 34;
+    flist[32][3] = 12;
+    ft[32][12].name_str = PyString_FromString("note");
+    ft[32][12].repeated = 0;
+    ft[32][12].type = 0;
+    flist[32][4] = -1;
+
+    flist[33][0] = 1;
+    ft[33][1].name_str = PyString_FromString("display_name");
+    ft[33][1].repeated = 0;
+    ft[33][1].type = 0;
+    flist[33][1] = 2;
+    ft[33][2].name_str = PyString_FromString("prefix");
+    ft[33][2].repeated = 0;
+    ft[33][2].type = 0;
+    flist[33][2] = 3;
+    ft[33][3].name_str = PyString_FromString("first");
+    ft[33][3].repeated = 0;
+    ft[33][3].type = 0;
+    flist[33][3] = 4;
+    ft[33][4].name_str = PyString_FromString("last");
+    ft[33][4].repeated = 0;
+    ft[33][4].type = 0;
+    flist[33][4] = 5;
+    ft[33][5].name_str = PyString_FromString("middle");
+    ft[33][5].repeated = 0;
+    ft[33][5].type = 0;
+    flist[33][5] = 6;
+    ft[33][6].name_str = PyString_FromString("suffix");
+    ft[33][6].repeated = 0;
+    ft[33][6].type = 0;
+    flist[33][6] = 7;
+    ft[33][7].name_str = PyString_FromString("nickname");
+    ft[33][7].repeated = 0;
+    ft[33][7].type = 0;
+    flist[33][7] = -1;
+
+    flist[35][0] = 1;
+    ft[35][1].name_str = PyString_FromString("email");
+    ft[35][1].repeated = 0;
+    ft[35][1].type = 0;
+    flist[35][1] = -1;
+}
 
 int get_type(int msgtype, int fieldid)
 {
-    // Contact
-    if(msgtype==1) {
-        switch(fieldid) {
-            case 1:
-                return 4;
-            case 5:
-                return 2;
-            case 6:
-                return 3;
-            case 12:
-                return 0;
-        }
+    // check if it is known field..
+    if( ft[msgtype][fieldid].name_str ) {
+        return ft[msgtype][fieldid].type;
     }
-
-    if(msgtype==2) {
-        if(fieldid==1)
-            return 0;
-    }
-
-    if(msgtype==3) {
-        if(fieldid==1)
-            return 0;
-    }
-
-    if(msgtype==4) {
-        switch(fieldid) {
-            case 1:
-                return 0;
-            case 3:
-                return 0;
-            case 4:
-                return 0;
-        }
-    }
-
     return -1;
 }
-
-PyObject *pystr_emails, *pystr_phones, *pystr_note, *pystr_first, *pystr_last, *pystr_display_name, *pystr_email, *pystr_phone, *pystr_name;
 
 /* create new object of specific type and return pointer to it */
 PyObject *object_new(int type)
 {
     PyObject *obj = PyDict_New();
-    if(type==1) {
-        PyDict_SetItem(obj, pystr_emails, PyList_New(0));
-        PyDict_SetItem(obj, pystr_phones, PyList_New(0));
+
+    // set defaults..
+    int i;
+    for(i=0; flist[type][i] != -1; i++) {
+        struct FieldDescriptor *f = &ft[type][flist[type][i]];
+        if( f->repeated )
+            PyDict_SetItem(obj, f->name_str, PyList_New(0));
     }
     return obj;
 }
@@ -106,48 +140,17 @@ PyObject *object_new(int type)
 /* set attribute of object or append to list */
 void object_add_field(PyObject* obj, int type, int field_id, PyObject* child)
 {
-    // printf("Setting or appending attribute.. %d.%d\n", type, field_id);
-    if(type==1 && field_id==1) {
-        PyDict_SetItem(obj, pystr_name, child);
-    }
+    struct FieldDescriptor *f = &ft[type][field_id];
+    if(f==NULL)
+        return;
 
-    if(type==1 && field_id==12) {
-        PyDict_SetItem(obj, pystr_note, child);
-    }
-
-    if(type==1 && field_id==5) {
+    if( ! f->repeated ) {
+        PyDict_SetItem(obj, f->name_str, child);
+    } else {
         PyObject* list;
-        list = PyDict_GetItem(obj, pystr_emails);
+        list = PyDict_GetItem(obj, f->name_str);
         PyList_Append(list, child);
     }
-
-    if(type==1 && field_id==6) {
-        PyObject* list;
-        list = PyDict_GetItem(obj, pystr_phones);
-        PyList_Append(list, child);
-    }
-
-    if(type==2 && field_id==1) {
-        PyDict_SetItem(obj, pystr_email, child);
-    }
-
-    if(type==3 && field_id==1) {
-        PyDict_SetItem(obj, pystr_phone, child);
-    }
-
-    if(type==4 && field_id==1) {
-        PyDict_SetItem(obj, pystr_display_name, child);
-    }
-
-    if(type==4 && field_id==3) {
-        PyDict_SetItem(obj, pystr_first, child);
-    }
-
-    if(type==4 && field_id==4) {
-        PyDict_SetItem(obj, pystr_last, child);
-    }
-
-
 }
 
 struct context {
@@ -397,17 +400,8 @@ PyMODINIT_FUNC initctest(void)
     Py_INCREF(&PBMsgType);
     PyModule_AddObject(mod, "PBMsg", (PyObject*)&PBMsgType);
 
-
-    pystr_emails = PyString_FromString("emails");
-    pystr_phones = PyString_FromString("phones");
-    pystr_name = PyString_FromString("name");
-    pystr_note = PyString_FromString("note");
-    pystr_first = PyString_FromString("first");
-    pystr_last = PyString_FromString("last");
-    pystr_display_name = PyString_FromString("display_name");
-    pystr_email = PyString_FromString("email");
-    pystr_phone = PyString_FromString("phone");
-
+    memset(ft, 0, sizeof(ft));
+    setup_table();
 
     return;
 }

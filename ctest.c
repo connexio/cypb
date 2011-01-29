@@ -4,41 +4,6 @@
 #include<Python.h>
 
 
-char *get_tag(char *c, long *tag)
-{
-    int shift = 0;
-    *tag = 0;
-    do {
-        *tag |= (*c & 0x7F) << shift;
-        if( (*c) & 0x80 ) 
-            shift += 7;
-        else {
-            c++;
-            break;
-        }
-        c++;
-    } while(1);
-    *tag >>= 3;
-    return c;
-}
-
-char *get_msg_len(char *c, long *len)
-{
-    int shift = 0;
-    *len = 0;
-    do {
-        *len |= (*c & 0x7F) << shift;
-        if( (*c) & 0x80 ) 
-            shift += 7;
-        else {
-            c++;
-            break;
-        }
-        c++;
-    } while(1);
-    return c;
-}
-
 struct FieldDescriptor
 {
     PyObject *name_str;
@@ -153,6 +118,41 @@ void object_add_field(PyObject* obj, int type, int field_id, PyObject* child)
     }
 }
 
+char *get_varint(char *c, long *val)
+{
+    int shift = 0;
+    *val = 0;
+    do {
+        *val |= (*c & 0x7F) << shift;
+        if( (*c) & 0x80 ) 
+            shift += 7;
+        else {
+            c++;
+            break;
+        }
+        c++;
+    } while(1);
+    return c;
+}
+
+char *get_32bit(char *c, unsigned int *val)
+{
+    *val = c[0] | (c[1] << 8) | (c[2] << 16) | (c[3] << 24);
+    c += 4;
+    return c;
+}
+
+char *get_64bit(char *c, unsigned long *val)
+{
+    int i;
+    *val = 0;
+    for (i = 7; i >= 0; i--)
+        *val = (*val << 8) | c[i];
+    c += 8;
+    return c;
+}
+
+
 struct context {
     PyObject *node;
     int type;
@@ -177,8 +177,9 @@ void* decode(char *msg, int type)
         unsigned long tag, len;
         int type = -1;
 
-        c = get_tag(c, &tag);
-        c = get_msg_len(c, &len);
+        c = get_varint(c, &tag);
+        c = get_varint(c, &len);
+        tag >>= 3;
         type = get_type(stack[top].type, tag);
 
         // printf("Tag %d Len %d Type = %d\n", tag, len, type);
@@ -256,7 +257,12 @@ static PBMsg* PBMsg_new(int msg_type, char *msg_data);
 static PyObject* PBMsg_getattr(PyObject  *o, PyObject  *attr_name);
 
 static int PBMsg_init(PBMsg *self, PyObject *arg, PyObject *kwds) { return 0; }
-static void PBMsg_dealloc(PBMsg *self)  { self->ob_type->tp_free((PyObject*)self); }
+
+static void PBMsg_dealloc(PBMsg *self)  {
+    free(self->msg_data);
+    self->ob_type->tp_free((PyObject*)self); 
+}
+
 static PyObject *
 PBMsg_new_py(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -343,8 +349,9 @@ void PBMsg_decode(PBMsg *node)
         unsigned long tag, len;
         int type = -1;
 
-        c = get_tag(c, &tag);
-        c = get_msg_len(c, &len);
+        c = get_varint(c, &tag);
+        c = get_varint(c, &len);
+        tag >>= 3;
         type = get_type(node->msg_type, tag);
 
         // printf("Tag %d Len %d Type = %d\n", tag, len, type);
@@ -383,7 +390,6 @@ static PyObject* PBMsg_getattr(PyObject  *o, PyObject  *attr_name)
 
     return PyDict_GetItem(self->fields, attr_name);
 }
-
 
 
 

@@ -235,10 +235,169 @@ static PyMethodDef methods[] = {
 };
 
 
+
+typedef struct {
+  PyObject_HEAD
+
+  int decoded;
+  int msg_type;
+  char *msg_data;
+  PyObject *fields;
+} PBMsg;
+
+static PyMethodDef pbmsg_methods[] = {
+    {NULL, NULL, 0, NULL}        /* Sentinel */
+};
+
+static PBMsg* PBMsg_new(int msg_type, char *msg_data);
+static PyObject* PBMsg_getattr(PyObject  *o, PyObject  *attr_name);
+
+static int PBMsg_init(PBMsg *self, PyObject *arg, PyObject *kwds) { return 0; }
+static void PBMsg_dealloc(PBMsg *self)  { self->ob_type->tp_free((PyObject*)self); }
+static PyObject *
+PBMsg_new_py(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    int msg_type;
+    char *msg_data;
+
+    if (PyArg_ParseTuple(args, "is", &msg_type, &msg_data)) {
+        return (PyObject *)PBMsg_new(msg_type, msg_data);
+    }
+}
+
+
+PyTypeObject PBMsgType = {
+  PyObject_HEAD_INIT(NULL)
+  0,                            /*ob_size*/
+  "ctest.PBMsg",           /*tp_name*/
+  sizeof(PBMsg),              /*tp_basicsize*/
+  0,                            /*tp_itemsize*/
+  /* methods */
+  (destructor)PBMsg_dealloc,  /*tp_dealloc*/
+  0,                            /*tp_print*/
+  0,                            /*tp_getattr*/
+  0,                            /*tp_setattr*/
+  0,                            /*tp_compare*/
+  0,                            /*tp_repr*/
+  0,                            /*tp_as_number*/
+  0,                            /*tp_as_sequence*/
+  0,                            /*tp_as_mapping*/
+  0,                            /*tp_hash*/
+  0,                            /*tp_call*/
+  0,                            /*tp_str*/
+  PBMsg_getattr,                            /*tp_getattro*/
+  0,                            /*tp_setattro*/
+  0,                            /*tp_as_buffer*/
+  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /*tp_flags*/
+  0,                            /*tp_doc*/
+  0,                            /*tp_traverse*/
+  0,                            /*tp_clear*/
+  0,                            /*tp_richcompare*/
+  0,                            /*tp_weaklistoffset*/
+  0,                            /*tp_iter*/
+  0,                            /*tp_iternext*/
+  pbmsg_methods,              /*tp_methods*/
+  0,                            /*tp_members*/
+  0,                            /*tp_getset*/
+  0,                            /*tp_base*/
+  0,                            /*tp_dict*/
+  0,                            /*tp_descr_get*/
+  0,                            /*tp_descr_set*/
+  0,                            /*tp_dictoffset*/
+  (initproc)PBMsg_init,       /*tp_init*/
+  0,                            /*tp_alloc*/
+  PBMsg_new_py,                  /*tp_new*/
+  0,                            /*tp_free*/
+  0,                            /*tp_is_gc*/
+};
+
+
+
+static PBMsg* PBMsg_new(int msg_type, char *msg_data)
+{
+        PBMsg *self;
+        self = (PBMsg *)PBMsgType.tp_alloc(&PBMsgType, 0);
+        if (self == NULL) return NULL;
+
+        self->decoded = 0;
+        self->msg_type = msg_type;
+        self->msg_data = malloc(strlen(msg_data)+1);
+        strcpy(self->msg_data, msg_data);
+
+        return self;
+}
+
+void PBMsg_decode(PBMsg *node)
+{
+    // printf("\nDecoding node... type=%d\n", node->msg_type);
+
+    // Traverse childs...
+    char *c = node->msg_data;
+    node->fields = object_new(node->msg_type);
+
+    while(*c) {
+
+        unsigned long tag, len;
+        int type = -1;
+
+        c = get_tag(c, &tag);
+        c = get_msg_len(c, &len);
+        type = get_type(node->msg_type, tag);
+
+        // printf("Tag %d Len %d Type = %d\n", tag, len, type);
+
+        if(type==-1) {
+            // unknown field, skip it..
+        } else if(type==0) {
+            // primitive.. just set attribute
+            char tmp = c[len];
+            c[len] = '\0';
+            object_add_field(node->fields, node->msg_type, tag, PyString_FromString(c));
+            c[len] = tmp;
+        } else {
+            // Create unparsed child node..
+            char tmp = c[len];
+            c[len] = '\0';
+            PBMsg *child = PBMsg_new(type, c);
+            c[len] = tmp;
+
+            object_add_field(node->fields, node->msg_type, tag, child);
+        }
+
+        c += len;
+    }
+ 
+    node->decoded = 1;
+}
+
+
+static PyObject* PBMsg_getattr(PyObject  *o, PyObject  *attr_name)
+{
+    PBMsg *self = (PBMsg*)o;
+
+    if(!self->decoded)
+        PBMsg_decode(self);
+
+    return PyDict_GetItem(self->fields, attr_name);
+}
+
+
+
+
 PyMODINIT_FUNC initctest(void); /*proto*/
 PyMODINIT_FUNC initctest(void)
 {
-    Py_InitModule("ctest", methods);
+
+    PBMsgType.tp_base = &PyBaseObject_Type;
+    if (PyType_Ready(&PBMsgType) < 0)
+        return;
+
+    PyObject *mod = Py_InitModule("ctest", methods);
+
+    Py_INCREF(&PBMsgType);
+    PyModule_AddObject(mod, "PBMsg", (PyObject*)&PBMsgType);
+
+
     pystr_emails = PyString_FromString("emails");
     pystr_phones = PyString_FromString("phones");
     pystr_name = PyString_FromString("name");

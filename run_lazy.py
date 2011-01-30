@@ -10,8 +10,12 @@ msg = "CiAKBUF0YXNoGghBdGFtdXJhZCINSGV6cmV0a3VsaXlldioUChJhdGFteXJhdEBnbWFpbC5jb
 msg = "Ch8KB0F0YXNoa2EaBUF0YXNoIg1IZXpyZXRrdWxpeWV2KhYKEmF0YW11cmFkQGNvbm5leC5pbxAC\nKhYKEmF0YW15cmF0QGdtYWlsLmNvbRABMgoKBjI3MDIwMxACMhIKDis5OTMgNjcgNjQyNjQyEAdS\nJAoJY29ubmV4LmlvEhBDVE8gJiBDby1Gb3VuZGVyKgUI2g8QAWIXdGVzdCBub3RlIGZyb20gc29t\nZSBndXk=\n".decode("base64")
 
 start = time.time()
+phones = []
 for i in range(5000):
     a = ctest.PBMsg(MSG_Contact, msg)
+    for p in a.phone:
+        phones.append(p.display_number)
+print len(phones)
 print "Our lazy c parser: ", time.time()-start
 
 

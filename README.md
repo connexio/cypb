@@ -1,6 +1,8 @@
+CyPB
+====
 
 What is CyPB?
-=============
+-------------
 
 CyPB is fast and light Protocol Buffers decoder for Python. 
 
@@ -50,15 +52,15 @@ For benchmarking, only full decode method is used instead of lazy decoder.
 Comparision were done on decoding same message 5000 times. 
 See connexio.proto and run_google.py for test message and structure.
 
-Environment:
- * MacBook Pro 2.66Ghz Intel Core 2 Duo
- * Python version: 2.6.1
- * GCC 4.2.1
+    Environment:
+     * MacBook Pro 2.66Ghz Intel Core 2 Duo
+     * Python version: 2.6.1
+     * GCC 4.2.1
 
-Average running time on 10 runs:
- * Google's Python module (2.3): 0.711271 seconds.
- * Google's C++ implementation for Python (2.4): 0.093410
- * CyPB: 0.041584 seconds.
+    Average running time on 10 runs:
+     * Google's Python module (2.3): 0.711271 seconds.
+     * Google's C++ implementation for Python (2.4): 0.093410
+     * CyPB: 0.041584 seconds.
 
 
 TODO

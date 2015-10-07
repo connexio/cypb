@@ -49,7 +49,7 @@ Full Decode Benchmark
 
 For benchmarking, only full decode method is used instead of lazy decoder. 
 
-Comparision were done on decoding same message 5000 times. 
+Comparison were done on decoding same message 5000 times. 
 See connexio.proto and run_google.py for test message and structure.
 
     Environment:
